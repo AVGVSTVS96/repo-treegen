@@ -6,29 +6,49 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-export function GithubTreeGenerator() {
-  const [repoUrl, setRepoUrl] = useState('')
-  const [depth, setDepth] = useState('3')
-  const [tree, setTree] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+interface GitHubTreeItem {
+  path: string
+  mode: string
+  type: string
+  size?: number
+  sha: string
+  url: string
+}
 
-  const fetchRepoStructure = async (owner: string, repo: string) => {
-    const branches = ['main', 'master'];
+interface GitHubTreeResponse {
+  sha: string
+  url: string
+  tree: GitHubTreeItem[]
+  truncated: boolean
+}
+
+type TreeNode = { [key: string]: TreeNode }
+
+export function GithubTreeGenerator() {
+  const [repoUrl, setRepoUrl] = useState<string>('')
+  const [depth, setDepth] = useState<string>('3')
+  const [tree, setTree] = useState<string>('')
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string>('')
+
+  const fetchRepoStructure = async (owner: string, repo: string): Promise<GitHubTreeResponse> => {
+    const branches = ['main', 'master']
     for (const branch of branches) {
       try {
-        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
-        if (response.ok) return response.json();
+        const response = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`
+        )
+        if (response.ok) return response.json()
       } catch (error) {
-        console.error(`Error fetching ${branch} branch:`, error);
+        console.error(`Error fetching ${branch} branch:`, error)
       }
     }
-    throw new Error('Failed to fetch repository structure');
-  };
+    throw new Error('Failed to fetch repository structure')
+  }
 
-  const generateTree = (data: any, maxDepth: number) => {
-    const tree: { [key: string]: any } = {}
-    data.tree.forEach((item: any) => {
+  const generateTree = (data: GitHubTreeResponse, maxDepth: number): string => {
+    const tree: TreeNode = {}
+    data.tree.forEach((item: GitHubTreeItem) => {
       const parts = item.path.split('/')
       let current = tree
       parts.forEach((part: string, index: number) => {
@@ -41,7 +61,7 @@ export function GithubTreeGenerator() {
       })
     })
 
-    const renderTree = (node: any, prefix = '') => {
+    const renderTree = (node: TreeNode, prefix = ''): string => {
       let result = ''
       const entries = Object.entries(node)
       entries.forEach(([key, value], index) => {
@@ -57,7 +77,7 @@ export function GithubTreeGenerator() {
     return renderTree(tree)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -66,6 +86,9 @@ export function GithubTreeGenerator() {
     try {
       const url = new URL(repoUrl)
       const [, owner, repo] = url.pathname.split('/')
+      if (!owner || !repo) {
+        throw new Error('Invalid repository URL format.')
+      }
       const data = await fetchRepoStructure(owner, repo)
       const generatedTree = generateTree(data, parseInt(depth))
       setTree(generatedTree)
