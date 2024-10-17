@@ -14,10 +14,17 @@ export function GithubTreeGenerator() {
   const [error, setError] = useState('')
 
   const fetchRepoStructure = async (owner: string, repo: string) => {
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`)
-    if (!response.ok) throw new Error('Failed to fetch repository structure')
-    return response.json()
-  }
+    const branches = ['main', 'master'];
+    for (const branch of branches) {
+      try {
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
+        if (response.ok) return response.json();
+      } catch (error) {
+        console.error(`Error fetching ${branch} branch:`, error);
+      }
+    }
+    throw new Error('Failed to fetch repository structure');
+  };
 
   const generateTree = (data: any, maxDepth: number) => {
     const tree: { [key: string]: any } = {}
@@ -62,7 +69,7 @@ export function GithubTreeGenerator() {
       const data = await fetchRepoStructure(owner, repo)
       const generatedTree = generateTree(data, parseInt(depth))
       setTree(generatedTree)
-    } catch (err) {
+    } catch {
       setError('Failed to generate tree. Please check the repository URL and try again.')
     } finally {
       setLoading(false)
